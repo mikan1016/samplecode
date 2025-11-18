@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>画像ゲーム</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>画像ゲーム</h1>
+
+  <div>
+    <label>背景画像選択: <input type="file" id="bgInput"></label>
+    <label>動く画像1選択: <input type="file" id="img1Input"></label>
+    <label>動く画像2選択: <input type="file" id="img2Input"></label>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <div>
+    <button id="stopBtn">止める</button>
+    <p>スコア: <span id="score">0</span></p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
