@@ -1,0 +1,141 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Index</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .share-buttons button { margin: 4px; }
+    #thumb-preview { width: 200px; border: 1px solid #ccc; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Index Page</h1>
+
+  <a href="free-move.html">Free Move へ移動</a>
+
+  <h2>画像の自動切り抜き（簡易版）</h2>
+  <input type="file" id="input-img" accept="image/*">
+  <canvas id="canvas-cut" width="400" height="600" style="display:none;"></canvas>
+  <img id="cut-result" alt="cut result" style="max-width:300px; display:block; margin-top:10px;" />
+
+  <script>
+    // 簡易背景除去（明度しきい値ベース）
+    document.getElementById('input-img').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('canvas-cut');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+          const avg = (d[i]+d[i+1]+d[i+2])/3;
+          if(avg > 230){ d[i+3] = 0; }
+        }
+        ctx.putImageData(imgData,0,0);
+        document.getElementById('cut-result').src = canvas.toDataURL();
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  </script>
+
+  <h2>SNS共有</h2>
+  <div class="share-buttons">
+    <button onclick="sharePage()">共有する</button>
+  </div>
+
+  <script>
+    function sharePage(){
+      if(navigator.share){
+        navigator.share({ title: '共有ページ', url: location.href });
+      } else {
+        alert('このブラウザはWeb Share APIに非対応です');
+      }
+    }
+  </script>
+
+  <h2>オリジナルサムネイル生成</h2>
+  <button onclick="generateThumb()">サムネイル生成</button>
+  <canvas id="thumb" width="400" height="200" style="display:none;"></canvas>
+  <img id="thumb-preview" />
+
+  <script>
+    function generateThumb(){
+      const c = document.getElementById('thumb');
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#eee';
+      ctx.fillRect(0,0,c.width,c.height);
+      ctx.fillStyle = '#333';
+      ctx.font = '28px sans-serif';
+      ctx.fillText('オリジナル サムネイル', 20, 100);
+      document.getElementById('thumb-preview').src = c.toDataURL();
+    }
+  </script>
+</body>
+</html>
+
+
+<!-- free-move.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Move</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .share-buttons button { margin: 4px; }
+    .movable { width: 200px; height: 200px; background:#8cf; position:absolute; cursor:grab; }
+  </style>
+</head>
+<body>
+  <h1>Free Move Page</h1>
+
+  <a href="index.html">Index に戻る</a>
+
+  <div class="movable" id="box">Drag Me</div>
+
+  <script>
+    // フリームーブ
+    const box = document.getElementById('box');
+    let isDown = false;
+    let offset = {x:0, y:0};
+    box.addEventListener('mousedown', e => {
+      isDown = true;
+      offset.x = e.clientX - box.offsetLeft;
+      offset.y = e.clientY - box.offsetTop;
+      box.style.cursor = 'grabbing';
+    });
+    document.addEventListener('mousemove', e => {
+      if(!isDown) return;
+      box.style.left = (e.clientX - offset.x) + 'px';
+      box.style.top = (e.clientY - offset.y) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      isDown = false;
+      box.style.cursor = 'grab';
+    });
+  </script>
+
+  <h2>SNS共有</h2>
+  <div class="share-buttons">
+    <button onclick="sharePage2()">共有する</button>
+  </div>
+
+  <script>
+    function sharePage2(){
+      if(navigator.share){
+        navigator.share({ title: 'Free Move', url: location.href });
+      } else {
+        alert('このブラウザはWeb Share APIに非対応です');
+      }
+    }
+  </script>
+</body>
+</html>
