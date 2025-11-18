@@ -41,6 +41,7 @@
 
 <button id="start">動かす</button>
 <button id="stop">止める</button>
+<button id="download">ダウンロード</button>
 
 <h3>最高得点：<span id="bestScore">0</span></h3>
 
@@ -87,7 +88,7 @@ function startMoving() {
   }, 100);
 }
 
-// スコア計算：中心に近いほど高得点
+// スコア計算：中心ほど高得点
 function calculateScore() {
   const centerX = gameArea.clientWidth / 2;
   const centerY = gameArea.clientHeight / 2;
@@ -99,22 +100,32 @@ function calculateScore() {
   const dy = centerY - imgY;
 
   const distance = Math.sqrt(dx*dx + dy*dy);
-
   const maxDist = Math.sqrt(centerX*centerX + centerY*centerY);
 
   const score = Math.max(0, Math.round(1000 * (1 - distance / maxDist)));
   return score;
 }
 
-// スクリーンショットを作成しダウンロード
-function downloadScreenshot() {
+// 止める（得点処理のみ）
+document.getElementById("stop").addEventListener("click", () => {
+  clearInterval(intervalId);
+
+  const score = calculateScore();
+  if (score > bestScore) {
+    bestScore = score;
+    document.getElementById("bestScore").textContent = bestScore;
+  }
+});
+
+// スクリーンショット生成 → ダウンロード
+document.getElementById("download").addEventListener("click", () => {
   const canvas = document.createElement("canvas");
   canvas.width = gameArea.clientWidth;
   canvas.height = gameArea.clientHeight;
 
   const ctx = canvas.getContext("2d");
 
-  // 背景
+  // 背景取得
   const bgStyle = window.getComputedStyle(gameArea).backgroundImage;
   const bgUrl = bgStyle.slice(5, -2);
 
@@ -124,12 +135,17 @@ function downloadScreenshot() {
   bgImg.onload = () => {
     ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
 
-    // 動く画像
     const img = new Image();
     img.src = movingImage.src;
 
     img.onload = () => {
-      ctx.drawImage(img, movingImage.offsetLeft, movingImage.offsetTop, movingImage.clientWidth, movingImage.clientHeight);
+      ctx.drawImage(
+        img,
+        movingImage.offsetLeft,
+        movingImage.offsetTop,
+        movingImage.clientWidth,
+        movingImage.clientHeight
+      );
 
       const link = document.createElement("a");
       link.download = "result.png";
@@ -137,21 +153,9 @@ function downloadScreenshot() {
       link.click();
     };
   };
-}
-
-// 止める
-document.getElementById("stop").addEventListener("click", () => {
-  clearInterval(intervalId);
-
-  const score = calculateScore();
-  if (score > bestScore) {
-    bestScore = score;
-    document.getElementById("bestScore").textContent = bestScore;
-  }
-
-  downloadScreenshot();
 });
 
+// ボタン
 document.getElementById("start").addEventListener("click", startMoving);
 </script>
 
