@@ -5,15 +5,27 @@
 <title>うまく試着できるかな？</title>
 
 <style>
-  body { font-family: sans-serif; text-align: center; }
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    margin: 0;
+    padding: 10px;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    margin-bottom: 10px;
+  }
+
   #gameArea {
     width: 100%;
-    height: 500px;
+    height: 60vh;
     border: 2px solid #666;
     position: relative;
     overflow: hidden;
     background-size: cover;
     background-position: center;
+    margin-top: 10px;
   }
 
   #movingImage {
@@ -21,6 +33,22 @@
     width: 200px;
     height: 300px;
     object-fit: cover;
+  }
+
+  button {
+    padding: 10px 15px;
+    font-size: 1.0rem;
+    margin: 5px;
+  }
+
+  #snsArea button {
+    background: #f0f0f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  #snsArea {
+    margin-top: 10px;
   }
 </style>
 </head>
@@ -30,7 +58,9 @@
 <h2>うまく試着できるかな？</h2>
 
 <!-- 背景画像アップロード -->
-<p>背景画像を選ぶ：<input type="file" id="bgInput" accept="image/*"></p>
+<p>背景画像を選ぶ：<br>
+  <input type="file" id="bgInput" accept="image/*">
+</p>
 
 <!-- 動く画像選択 -->
 <p>動く画像を選ぶ：</p>
@@ -44,6 +74,13 @@
 <button id="download">ダウンロード</button>
 
 <h3>最高得点：<span id="bestScore">0</span></h3>
+
+<div id="snsArea">
+  <p>SNSでシェア：</p>
+  <button id="shareX">X（Twitter）</button>
+  <button id="shareLINE">LINE</button>
+  <button id="shareInsta">Instagram</button>
+</div>
 
 <div id="gameArea">
   <img id="movingImage" src="uniform1.png">
@@ -80,15 +117,15 @@ function startMoving() {
     const maxX = gameArea.clientWidth - movingImage.clientWidth;
     const maxY = gameArea.clientHeight - movingImage.clientHeight;
 
-    const x = Math.random() * maxX;
-    const y = Math.random() * maxY;
+    const x = Math.random() * Math.max(0, maxX);
+    const y = Math.random() * Math.max(0, maxY);
 
     movingImage.style.left = x + "px";
     movingImage.style.top = y + "px";
-  }, 100);
+  }, 120);
 }
 
-// スコア計算：中心ほど高得点
+// スコア計算
 function calculateScore() {
   const centerX = gameArea.clientWidth / 2;
   const centerY = gameArea.clientHeight / 2;
@@ -106,7 +143,7 @@ function calculateScore() {
   return score;
 }
 
-// 止める（得点処理のみ）
+// 止める
 document.getElementById("stop").addEventListener("click", () => {
   clearInterval(intervalId);
 
@@ -117,7 +154,7 @@ document.getElementById("stop").addEventListener("click", () => {
   }
 });
 
-// スクリーンショット生成 → ダウンロード
+// ダウンロード
 document.getElementById("download").addEventListener("click", () => {
   const canvas = document.createElement("canvas");
   canvas.width = gameArea.clientWidth;
@@ -125,7 +162,7 @@ document.getElementById("download").addEventListener("click", () => {
 
   const ctx = canvas.getContext("2d");
 
-  // 背景取得
+  // 背景読み込み
   const bgStyle = window.getComputedStyle(gameArea).backgroundImage;
   const bgUrl = bgStyle.slice(5, -2);
 
@@ -155,11 +192,31 @@ document.getElementById("download").addEventListener("click", () => {
   };
 });
 
-// ボタン
+
+// ▼▼ SNS 共有機能 ▼▼
+
+// X（Twitter）
+document.getElementById("shareX").addEventListener("click", () => {
+  const text = encodeURIComponent(`【うまく試着できるかな？】\n最高得点：${bestScore} 点！\nあなたも挑戦してみてね！`);
+  const url = encodeURIComponent(window.location.href);
+  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`);
+});
+
+// LINE
+document.getElementById("shareLINE").addEventListener("click", () => {
+  const text = encodeURIComponent(`最高得点：${bestScore} 点！\n「うまく試着できるかな？」で遊んでみてね！\n${window.location.href}`);
+  window.open(`https://line.me/R/msg/text/?${text}`);
+});
+
+// Instagram（投稿API不可 → アプリ誘導）
+document.getElementById("shareInsta").addEventListener("click", () => {
+  alert("画像を保存した後、Instagramで投稿してね！");
+  window.open("instagram://app");  // Instagramアプリを開く
+});
+
+// スタート
 document.getElementById("start").addEventListener("click", startMoving);
 </script>
 
 </body>
 </html>
-
-
