@@ -1,26 +1,207 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>画像ゲーム</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<title>制服キャッチゲーム（最高得点・比率修正）</title>
+
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 16px; }
+
+  #gameArea {
+    width: 100%;
+    max-width: 900px;
+    height: 700px;
+    border: 1px solid #ccc;
+    position: relative;
+    overflow: hidden;
+    margin: 16px auto;
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* ← 制服画像の自然な比率に修正（300×450） */
+  .movingImg {
+    position: absolute;
+    width: 300px;
+    height: 450px;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  #selector img {
+    width: 150px;
+    height: 225px;
+    object-fit: contain;
+    margin: 10px;
+    cursor: pointer;
+    border: 3px solid transparent;
+  }
+
+  #selector img.selected { border: 3px solid red; }
+
+  #hud span {
+    display:inline-block;
+    min-width: 140px;
+  }
+
+  #roundPoints {
+    font-weight: bold;
+    color: green;
+  }
+
+  #bestScore {
+    font-weight: bold;
+    color: blue;
+  }
+</style>
 </head>
 <body>
-  <h1>画像ゲーム</h1>
 
-  <div>
-    <label>背景画像選択: <input type="file" id="bgInput"></label>
-    <label>動く画像1選択: <input type="file" id="img1Input"></label>
-    <label>動く画像2選択: <input type="file" id="img2Input"></label>
-  </div>
+<h2>背景画像をアップロード → 制服を選択 → スタート</h2>
 
-  <canvas id="gameCanvas" width="800" height="600"></canvas>
+<label>背景画像: <input type="file" id="bgUpload" accept="image/*"></label>
 
-  <div>
-    <button id="stopBtn">止める</button>
-    <p>スコア: <span id="score">0</span></p>
-  </div>
+<h3>動かす制服を選んでください</h3>
+<div id="selector">
+  <img id="img1" src="uniform1.png">
+  <img id="img2" src="uniform2.png">
+</div>
 
-  <script src="script.js"></script>
+<div id="hud">
+  <span>今回の得点: <strong id="roundPoints">0</strong></span>
+  <span>最高得点: <strong id="bestScore">0</strong></span>
+  <span>中心に近いほど高得点！</span>
+</div>
+
+<button id="startBtn">スタート</button>
+<button id="stopBtn">止める</button>
+
+<div id="gameArea"></div>
+
+<script>
+/* ---------- 状態 ---------- */
+let selectedImg = null;
+let roundScore = 0;
+let bestScore = 0;
+
+let moveInterval = null;
+let posX = 0;
+let posY = 0;
+let dirX = 1;
+
+const imgW = 300;   // ← 修正後
+const imgH = 450;   // ← 修正後
+const speed = 5;
+
+const gameArea = document.getElementById("gameArea");
+const roundEl = document.getElementById("roundPoints");
+const bestEl = document.getElementById("bestScore");
+
+/* ---------- 背景画像 ---------- */
+document.getElementById("bgUpload").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const r = new FileReader();
+  r.onload = ev => {
+    gameArea.style.backgroundImage = `url(${ev.target.result})`;
+  };
+  r.readAsDataURL(file);
+});
+
+/* ---------- 制服選択 ---------- */
+document.querySelectorAll("#selector img").forEach(img => {
+  img.addEventListener("click", () => {
+    document.querySelectorAll("#selector img").forEach(i => i.classList.remove("selected"));
+    img.classList.add("selected");
+    selectedImg = img.src;
+  });
+});
+
+/* ---------- スタート ---------- */
+document.getElementById("startBtn").addEventListener("click", () => {
+  if (!selectedImg) {
+    alert("制服を選んでください");
+    return;
+  }
+  startRound();
+});
+
+/* ---------- 止める（判定） ---------- */
+document.getElementById("stopBtn").addEventListener("click", () => {
+  stopRoundAndScore();
+});
+
+/* ---------- ラウンド開始 ---------- */
+function startRound() {
+  stopMovement();
+
+  roundScore = 0;
+  roundEl.innerText = "0";
+
+  gameArea.innerHTML = "";
+
+  posX = 0;
+  posY = (gameArea.clientHeight - imgH) / 2;
+
+  const img = document.createElement("img");
+  img.src = selectedImg;
+  img.className = "movingImg";
+  img.style.left = posX + "px";
+  img.style.top = posY + "px";
+  gameArea.appendChild(img);
+
+  moveInterval = setInterval(() => {
+    const maxX = gameArea.clientWidth - imgW;
+    posX += speed * dirX;
+
+    if (posX >= maxX || posX <= 0) dirX *= -1;
+
+    img.style.left = posX + "px";
+  }, 20);
+}
+
+/* ---------- 判定・得点 ---------- */
+function stopRoundAndScore() {
+  if (!moveInterval) return;
+
+  stopMovement();
+
+  const areaCenterX = gameArea.clientWidth / 2;
+  const areaCenterY = gameArea.clientHeight / 2;
+
+  const imgCenterX = posX + imgW / 2;
+  const imgCenterY = posY + imgH / 2;
+
+  const dx = Math.abs(imgCenterX - areaCenterX);
+  const dy = Math.abs(imgCenterY - areaCenterY);
+
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const maxDist = Math.sqrt(
+    (gameArea.clientWidth ** 2) + (gameArea.clientHeight ** 2)
+  );
+
+  const scoreGain = Math.max(0, Math.floor((1 - dist / maxDist) * 1000));
+
+  roundScore = scoreGain;
+  roundEl.innerText = roundScore;
+
+  /* 最高得点を更新 */
+  if (scoreGain > bestScore) {
+    bestScore = scoreGain;
+    bestEl.innerText = bestScore;
+  }
+}
+
+/* ---------- 動きを止める ---------- */
+function stopMovement() {
+  if (moveInterval) {
+    clearInterval(moveInterval);
+    moveInterval = null;
+  }
+}
+</script>
+
 </body>
 </html>
+
