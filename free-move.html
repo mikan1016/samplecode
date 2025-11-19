@@ -2,13 +2,15 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>うまく試着できるかな？ - 自由移動</title>
+<title>自由に試着してみよう</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
   body {
     font-family: sans-serif;
-    background: #fafafa;
     text-align: center;
+    background: #fafafa;
+    padding: 10px;
   }
 
   #container {
@@ -19,16 +21,39 @@
 
   #bg {
     width: 100%;
-    border: 2px solid #555;
+    border: 2px solid #666;
+    border-radius: 10px;
   }
 
   #char {
+    position: absolute;
     width: 300px;
     height: 660px;
-    position: absolute;
-    top: 50px;
-    left: 50px;
+    top: 60px;
+    left: 60px;
     touch-action: none;
+  }
+
+  button {
+    padding: 10px 18px;
+    font-size: 17px;
+    margin: 5px;
+    border-radius: 10px;
+    border: none;
+    color: #fff;
+  }
+
+  .share-btn { background: #1d9bf0; }
+  .line-btn { background: #00b900; }
+
+  a.page-link {
+    display: block;
+    margin-top: 20px;
+    padding: 12px;
+    background: #5a5a5a;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
   }
 </style>
 </head>
@@ -50,28 +75,37 @@
   <img id="char" src="uniform1.png">
 </div>
 
+<hr>
+
+<h3>SNS共有</h3>
+<button class="share-btn" onclick="shareTwitter()">X（Twitter）で共有</button><br>
+<button class="line-btn" onclick="shareLine()">LINEで共有</button>
+
+<a class="page-link" href="index.html">← ゲームモードへ戻る</a>
+
 <script>
 const bg = document.getElementById("bg");
 const bgInput = document.getElementById("bgInput");
 const char = document.getElementById("char");
 const charSelect = document.getElementById("charSelect");
 
-// 背景画像
+// 背景画像読込
 bgInput.addEventListener("change", e => {
   const file = e.target.files[0];
-  if (file) bg.src = URL.createObjectURL(file);
+  if(file) bg.src = URL.createObjectURL(file);
 });
 
-// 動く画像
+// キャラ画像変更
 charSelect.addEventListener("change", () => {
   char.src = charSelect.value;
 });
 
-// --- ドラッグ移動（PC + タッチ両対応） ---
-let offsetX = 0, offsetY = 0;
+// --- ドラッグ移動 ---
 let dragging = false;
+let offsetX = 0;
+let offsetY = 0;
 
-function startDrag(e) {
+function startDrag(e){
   dragging = true;
 
   const rect = char.getBoundingClientRect();
@@ -80,12 +114,10 @@ function startDrag(e) {
 
   offsetX = x - rect.left;
   offsetY = y - rect.top;
-
-  e.preventDefault();
 }
 
-function moveDrag(e) {
-  if (!dragging) return;
+function moveDrag(e){
+  if(!dragging) return;
 
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   const y = e.touches ? e.touches[0].clientY : e.clientY;
@@ -94,7 +126,7 @@ function moveDrag(e) {
   char.style.top = (y - offsetY) + "px";
 }
 
-function endDrag() {
+function endDrag(){
   dragging = false;
 }
 
@@ -105,6 +137,19 @@ window.addEventListener("mouseup", endDrag);
 char.addEventListener("touchstart", startDrag);
 window.addEventListener("touchmove", moveDrag);
 window.addEventListener("touchend", endDrag);
+
+// ===== SNS共有 =====
+function shareTwitter(){
+  const text = encodeURIComponent("自由に試着して遊んでみた！");
+  const url = encodeURIComponent(location.href);
+  window.open("https://twitter.com/intent/tweet?text="+text+"&url="+url);
+}
+
+function shareLine(){
+  const text = encodeURIComponent("自由に試着して遊んでみた！");
+  const url = encodeURIComponent(location.href);
+  window.open("https://line.me/R/msg/text/?" + text + "%0D%0A" + url);
+}
 </script>
 
 </body>
