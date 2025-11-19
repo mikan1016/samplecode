@@ -3,25 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <title>うまく試着できるかな？</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
   body {
     font-family: sans-serif;
     text-align: center;
     margin: 0;
-    background: #f4f4f4;
+    background: #f0f0f0;
+    padding: 10px;
+  }
+
+  h2 {
+    margin-top: 10px;
   }
 
   #gameContainer {
     width: 100%;
     max-width: 430px;
-    margin: 0 auto;
+    margin: 10px auto;
     position: relative;
   }
 
   #background {
     width: 100%;
     height: auto;
-    border: 2px solid #555;
+    border-radius: 10px;
+    border: 2px solid #666;
   }
 
   #movingImg {
@@ -31,8 +40,37 @@
     pointer-events: none;
   }
 
-  #controls {
-    margin-top: 15px;
+  button {
+    padding: 12px 20px;
+    font-size: 17px;
+    border-radius: 10px;
+    border: none;
+    margin: 5px;
+    background: #4caf50;
+    color: white;
+  }
+
+  button:active {
+    opacity: 0.7;
+  }
+
+  .share-btn {
+    background: #1d9bf0;
+    border-radius: 8px;
+  }
+
+  .line-btn {
+    background: #00b900;
+  }
+
+  a.page-link {
+    display: block;
+    margin-top: 20px;
+    padding: 12px;
+    background: #555;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
   }
 </style>
 </head>
@@ -41,12 +79,12 @@
 <h2>うまく試着できるかな？（ゲームモード）</h2>
 
 <div>
-  背景画像を選ぶ：<br>
+  <p>背景画像を選ぶ：</p>
   <input type="file" id="bgInput" accept="image/*">
 </div>
 
 <div>
-  動く画像を選ぶ：<br>
+  <p>動く画像を選ぶ：</p>
   <select id="characterSelect">
     <option value="uniform1.png">画像1（制服A）</option>
     <option value="uniform2.png">画像2（制服B）</option>
@@ -54,15 +92,24 @@
 </div>
 
 <div id="gameContainer">
-  <img id="background" src="" alt="背景画像">
+  <img id="background" src="">
   <img id="movingImg" src="uniform1.png">
 </div>
 
-<div id="controls">
-  <button id="startBtn">動かす</button>
-  <button id="stopBtn">止める</button>
-  <p>最高得点：<span id="bestScore">0</span></p>
-</div>
+<button id="startBtn">動かす</button>
+<button id="stopBtn">止める</button>
+
+<p>最高得点：<span id="bestScore">0</span></p>
+
+<hr>
+
+<h3>SNS共有</h3>
+<button class="share-btn" onclick="shareTwitter()">X（Twitter）で共有</button><br>
+<button class="line-btn" onclick="shareLine()">LINEで共有</button>
+
+<hr>
+
+<a class="page-link" href="free-move.html">→ 自由移動モードへ</a>
 
 <script>
 let moveInterval;
@@ -73,7 +120,7 @@ const background = document.getElementById("background");
 const movingImg = document.getElementById("movingImg");
 const characterSelect = document.getElementById("characterSelect");
 
-// 背景画像読み込み
+// 背景画像読込
 bgInput.addEventListener("change", function(e){
   const file = e.target.files[0];
   if(file){
@@ -81,12 +128,12 @@ bgInput.addEventListener("change", function(e){
   }
 });
 
-// 動く画像選択
+// キャラ変更
 characterSelect.addEventListener("change", () => {
   movingImg.src = characterSelect.value;
 });
 
-// ランダム移動（中心に行く確率 1/4）
+// ランダム移動（1/4 で中央へ寄る）
 function moveImage() {
   const bgRect = background.getBoundingClientRect();
   const w = movingImg.offsetWidth;
@@ -95,12 +142,12 @@ function moveImage() {
   let x, y;
 
   if (Math.random() < 0.25) {
-    // 中央寄せ強化
-    x = bgRect.left + bgRect.width / 2 + (Math.random() * 40 - 20);
-    y = bgRect.top + bgRect.height / 2 + (Math.random() * 40 - 20);
+    // 中央に寄せる
+    x = bgRect.left + bgRect.width / 2 - w/2 + (Math.random()*40 - 20);
+    y = bgRect.top + bgRect.height / 2 - h/2 + (Math.random()*40 - 20);
   } else {
-    x = bgRect.left + Math.random() * (bgRect.width - w);
-    y = bgRect.top + Math.random() * (bgRect.height - h);
+    x = bgRect.left + Math.random()*(bgRect.width - w);
+    y = bgRect.top + Math.random()*(bgRect.height - h);
   }
 
   movingImg.style.left = x + "px";
@@ -120,23 +167,36 @@ document.getElementById("stopBtn").onclick = () => {
   const bgRect = background.getBoundingClientRect();
   const imgRect = movingImg.getBoundingClientRect();
 
-  const centerX_bg = bgRect.left + bgRect.width / 2;
-  const centerY_bg = bgRect.top + bgRect.height / 2;
+  const cx_bg = bgRect.left + bgRect.width/2;
+  const cy_bg = bgRect.top + bgRect.height/2;
 
-  const centerX_img = imgRect.left + imgRect.width / 2;
-  const centerY_img = imgRect.top + imgRect.height / 2;
+  const cx_img = imgRect.left + imgRect.width/2;
+  const cy_img = imgRect.top + imgRect.height/2;
 
-  const dx = centerX_bg - centerX_img;
-  const dy = centerY_bg - centerY_img;
-  const distance = Math.sqrt(dx * dx + dy * dy);
+  const dx = cx_bg - cx_img;
+  const dy = cy_bg - cy_img;
 
+  const distance = Math.sqrt(dx*dx + dy*dy);
   const score = Math.max(0, Math.floor(1000 - distance));
 
-  if (score > bestScore) {
+  if(score > bestScore){
     bestScore = score;
     document.getElementById("bestScore").textContent = bestScore;
   }
 };
+
+// ===== SNS共有 =====
+function shareTwitter(){
+  const text = encodeURIComponent("試着ゲームで遊んでみた！最高得点は " + bestScore + " 点！");
+  const url = encodeURIComponent(location.href);
+  window.open("https://twitter.com/intent/tweet?text="+text+"&url="+url);
+}
+
+function shareLine(){
+  const text = encodeURIComponent("試着ゲームで遊んでみた！最高得点は " + bestScore + " 点！");
+  const url = encodeURIComponent(location.href);
+  window.open("https://line.me/R/msg/text/?" + text + "%0D%0A" + url);
+}
 </script>
 
 </body>
