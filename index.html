@@ -1,222 +1,292 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>うまく試着できるかな？</title>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>うまく試着できるかな？（ゲーム）</title>
 <style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 10px;
-  }
-
-  h2 {
-    font-size: 1.4rem;
-    margin-bottom: 10px;
-  }
-
-  #gameArea {
-    width: 100%;
-    height: 60vh;
-    border: 2px solid #666;
-    position: relative;
-    overflow: hidden;
-    background-size: cover;
-    background-position: center;
-    margin-top: 10px;
-  }
-
-  #movingImage {
-    position: absolute;
-    width: 300px;
-    height: 660px;
-    object-fit: cover;
-  }
-
-  button {
-    padding: 10px 15px;
-    font-size: 1.0rem;
-    margin: 5px;
-  }
-
-  #snsArea button {
-    background: #f0f0f0;
-    border-radius: 6px;
-    padding: 8px 12px;
-  }
-
-  #snsArea {
-    margin-top: 10px;
-  }
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","メイリオ",sans-serif;margin:12px;}
+  header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  h1{font-size:1.2rem;margin:0}
+  #gameArea{width:100%;height:60vh;border:2px solid #999;position:relative;overflow:hidden;background-size:cover;background-position:center;margin-top:10px}
+  #movingImage{position:absolute;width:200px;height:300px;object-fit:cover;pointer-events:none}
+  .controls{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button{padding:8px 12px;font-size:1rem;border-radius:8px}
+  #snsArea button{padding:6px 10px}
+  @media(min-width:900px){ #gameArea{height:70vh} }
 </style>
 </head>
-
 <body>
 
-<h2>うまく試着できるかな？</h2>
+<header>
+  <h1>うまく試着できるかな？</h1>
+  <nav>
+    <a href="free-move.html">自由移動ページへ</a>
+  </nav>
+</header>
 
-<!-- 背景画像アップロード -->
-<p>背景画像を選ぶ：<br>
-  <input type="file" id="bgInput" accept="image/*">
-</p>
+<section class="controls">
+  <label>背景画像：
+    <input id="bgInput" type="file" accept="image/*">
+  </label>
 
-<!-- 動く画像選択 -->
-<p>動く画像を選ぶ：</p>
-<label><input type="radio" name="char" value="uniform1.png" checked> 画像1</label>
-<label><input type="radio" name="char" value="uniform2.png"> 画像2</label>
+  <div>
+    動く画像：
+    <label><input type="radio" name="char" value="uniform1.png" checked> 画像1</label>
+    <label><input type="radio" name="char" value="uniform2.png"> 画像2</label>
+  </div>
 
-<br><br>
+  <button id="start">動かす</button>
+  <button id="stop">止める</button>
+  <button id="download">ダウンロード</button>
+  <button id="makeThumb">サムネイル生成</button>
 
-<button id="start">動かす</button>
-<button id="stop">止める</button>
-<button id="download">ダウンロード</button>
+  <div style="margin-left:12px;">
+    最高得点：<strong id="bestScore">0</strong>
+  </div>
+</section>
 
-<h3>最高得点：<span id="bestScore">0</span></h3>
-
-<div id="snsArea">
-  <p>SNSでシェア：</p>
-  <button id="shareX">X（Twitter）</button>
+<section id="snsArea" style="margin-top:6px">
+  <span>SNS共有：</span>
+  <button id="shareX">X</button>
   <button id="shareLINE">LINE</button>
   <button id="shareInsta">Instagram</button>
-</div>
+</section>
 
 <div id="gameArea">
-  <img id="movingImage" src="uniform1.png">
+  <img id="movingImage" src="uniform1.png" alt="moving">
+</div>
+
+<!-- Thumbnail preview -->
+<div style="margin-top:10px;">
+  <p>生成されたサムネイル（プレビュー）</p>
+  <img id="thumbPreview" style="width:180px;height:180px;object-fit:cover;border:1px solid #ccc;">
+  <a id="thumbSave" style="display:inline-block;margin-left:8px;padding:8px 10px;background:#2b7cff;color:#fff;border-radius:6px;text-decoration:none">ダウンロード</a>
 </div>
 
 <script>
-let intervalId;
+/* ---------- 設定 ---------- */
+const gameArea = document.getElementById('gameArea');
+const movingImage = document.getElementById('movingImage');
+const bgInput = document.getElementById('bgInput');
+const startBtn = document.getElementById('start');
+const stopBtn = document.getElementById('stop');
+const downloadBtn = document.getElementById('download');
+const makeThumbBtn = document.getElementById('makeThumb');
+const thumbPreview = document.getElementById('thumbPreview');
+const thumbSave = document.getElementById('thumbSave');
+const bestScoreEl = document.getElementById('bestScore');
+
+let intervalId = null;
 let bestScore = 0;
+let currentScore = 0;
+const imgW = 200, imgH = 300;
+let lastLeft = 0, lastTop = 0;
 
-// 背景設定
-document.getElementById("bgInput").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const url = URL.createObjectURL(file);
-  document.getElementById("gameArea").style.backgroundImage = `url(${url})`;
+/* 背景アップロード（dataURLで保持） */
+let bgDataUrl = null;
+bgInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    bgDataUrl = ev.target.result;
+    gameArea.style.backgroundImage = `url(${bgDataUrl})`;
+  };
+  r.readAsDataURL(f);
 });
 
-// キャラ選択
-document.querySelectorAll("input[name='char']").forEach(r => {
-  r.addEventListener("change", () => {
-    document.getElementById("movingImage").src = r.value;
+/* キャラ選択 */
+document.querySelectorAll("input[name='char']").forEach(r=>{
+  r.addEventListener('change', ()=>{
+    movingImage.src = r.value;
   });
 });
 
-const gameArea = document.getElementById("gameArea");
-const movingImage = document.getElementById("movingImage");
-
-// ランダムに動かす
-function startMoving() {
-  clearInterval(intervalId);
-
-  intervalId = setInterval(() => {
-    const maxX = gameArea.clientWidth - movingImage.clientWidth;
-    const maxY = gameArea.clientHeight - movingImage.clientHeight;
-
-    const x = Math.random() * Math.max(0, maxX);
-    const y = Math.random() * Math.max(0, maxY);
-
-    movingImage.style.left = x + "px";
-    movingImage.style.top = y + "px";
-  }, 120);
+/* 中心バイアス移動：25%の確率で中心近傍に行く */
+function computeNextPos() {
+  const areaW = gameArea.clientWidth;
+  const areaH = gameArea.clientHeight;
+  // 25% で中心近傍
+  if(Math.random() < 0.25) {
+    // 範囲：中心 ± (area * 0.12) を狙う
+    const cx = areaW/2 + (Math.random()*2-1) * areaW*0.12;
+    const cy = areaH/2 + (Math.random()*2-1) * areaH*0.12;
+    const left = Math.max(0, Math.min(areaW - imgW, cx - imgW/2));
+    const top  = Math.max(0, Math.min(areaH - imgH, cy - imgH/2));
+    return {left, top};
+  } else {
+    // 完全ランダム
+    const left = Math.random() * Math.max(0, areaW - imgW);
+    const top  = Math.random() * Math.max(0, areaH - imgH);
+    return {left, top};
+  }
 }
 
-// スコア計算
-function calculateScore() {
-  const centerX = gameArea.clientWidth / 2;
-  const centerY = gameArea.clientHeight / 2;
+/* 動かす */
+function startMoving(){
+  clearInterval(intervalId);
+  intervalId = setInterval(()=>{
+    const pos = computeNextPos();
+    movingImage.style.left = pos.left + 'px';
+    movingImage.style.top  = pos.top + 'px';
+    lastLeft = pos.left; lastTop = pos.top;
+  }, 350); // 350ms ごとに位置変化
+}
 
-  const imgX = movingImage.offsetLeft + movingImage.clientWidth / 2;
-  const imgY = movingImage.offsetTop + movingImage.clientHeight / 2;
+/* 停止・得点計算（中心に近いほど高得点） */
+function calculateScoreAtCurrent() {
+  const areaCenterX = gameArea.clientWidth/2;
+  const areaCenterY = gameArea.clientHeight/2;
 
-  const dx = centerX - imgX;
-  const dy = centerY - imgY;
+  const imgCenterX = lastLeft + imgW/2;
+  const imgCenterY = lastTop + imgH/2;
 
-  const distance = Math.sqrt(dx*dx + dy*dy);
-  const maxDist = Math.sqrt(centerX*centerX + centerY*centerY);
+  const dx = areaCenterX - imgCenterX;
+  const dy = areaCenterY - imgCenterY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
 
-  const score = Math.max(0, Math.round(1000 * (1 - distance / maxDist)));
+  const maxDist = Math.sqrt((areaCenterX)**2 + (areaCenterY)**2);
+  const score = Math.max(0, Math.round(1000 * (1 - dist/maxDist)));
   return score;
 }
 
-// 止める
-document.getElementById("stop").addEventListener("click", () => {
+startBtn.addEventListener('click', ()=> {
+  startMoving();
+});
+
+stopBtn.addEventListener('click', ()=>{
   clearInterval(intervalId);
+  // Ensure lastLeft/Top are set based on actual position
+  if(movingImage.style.left) lastLeft = parseFloat(movingImage.style.left);
+  if(movingImage.style.top) lastTop = parseFloat(movingImage.style.top);
+  currentScore = calculateScoreAtCurrent();
+  if(currentScore > bestScore){ bestScore = currentScore; bestScoreEl.textContent = bestScore; }
+  alert('今回の得点：' + currentScore + '　最高得点：' + bestScore);
+});
 
-  const score = calculateScore();
-  if (score > bestScore) {
-    bestScore = score;
-    document.getElementById("bestScore").textContent = bestScore;
+/* ダウンロード（canvas合成） */
+downloadBtn.addEventListener('click', async ()=>{
+  // create canvas sized to gameArea
+  const w = gameArea.clientWidth, h = gameArea.clientHeight;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+
+  // bg
+  if(bgDataUrl){
+    await drawImageFromSrc(ctx, bgDataUrl, 0,0,w,h);
+  } else {
+    // neutral bg
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
   }
+
+  // moving image
+  const src = movingImage.src;
+  const left = lastLeft || parseFloat(movingImage.style.left) || 0;
+  const top  = lastTop  || parseFloat(movingImage.style.top) || 0;
+  await drawImageFromSrc(ctx, src, left, top, imgW, imgH);
+
+  // download
+  const link = document.createElement('a');
+  link.href = c.toDataURL('image/png');
+  link.download = 'result.png';
+  link.click();
 });
 
-// ダウンロード
-document.getElementById("download").addEventListener("click", () => {
-  const canvas = document.createElement("canvas");
-  canvas.width = gameArea.clientWidth;
-  canvas.height = gameArea.clientHeight;
+/* サムネイル生成（600x600）：背景ぼかし + 制服中央 + タイトルテキスト */
+makeThumbBtn.addEventListener('click', async ()=>{
+  const size = 600;
+  const c = document.createElement('canvas'); c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
 
-  const ctx = canvas.getContext("2d");
+  // 背景（blur）: draw bg scaled & apply simple box blur via temporary canvas (approx)
+  if(bgDataUrl){
+    // draw bg scaled to canvas
+    await drawImageFromSrc(ctx, bgDataUrl, 0,0,size,size);
+    // apply CSS blur via filter for simplicity if available
+    // We'll use an offscreen canvas and ctx.filter
+    try{
+      const off = document.createElement('canvas'); off.width=size; off.height=size;
+      const offCtx = off.getContext('2d');
+      offCtx.filter = 'blur(12px)';
+      const bg = new Image(); bg.src = bgDataUrl;
+      await new Promise(r=>{ bg.onload=r; });
+      offCtx.drawImage(bg,0,0,size,size);
+      ctx.clearRect(0,0,size,size);
+      ctx.drawImage(off,0,0,size,size);
+    }catch(e){
+      // fallback: leave as-is
+    }
+  } else {
+    ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0,0,size,size);
+  }
 
-  // 背景読み込み
-  const bgStyle = window.getComputedStyle(gameArea).backgroundImage;
-  const bgUrl = bgStyle.slice(5, -2);
+  // overlay semi-transparent dark layer for contrast
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0,0,size,size);
 
-  const bgImg = new Image();
-  bgImg.src = bgUrl;
+  // draw moving image centered with scale to fit nicely
+  const img = new Image(); img.src = movingImage.src;
+  await new Promise(r=>{ img.onload=r; });
+  // scale to about 60% of thumbnail width
+  const targetW = size * 0.6;
+  const targetH = targetW * (imgH/imgW);
+  const x = (size - targetW)/2;
+  const y = (size - targetH)/2 - 20;
+  ctx.drawImage(img, x, y, targetW, targetH);
 
-  bgImg.onload = () => {
-    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+  // Title text at bottom
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'white';
+  ctx.fillText('うまく試着できるかな？', size/2, size - 36);
+  // stroke for readability
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeText('うまく試着できるかな？', size/2, size - 36);
 
-    const img = new Image();
-    img.src = movingImage.src;
-
-    img.onload = () => {
-      ctx.drawImage(
-        img,
-        movingImage.offsetLeft,
-        movingImage.offsetTop,
-        movingImage.clientWidth,
-        movingImage.clientHeight
-      );
-
-      const link = document.createElement("a");
-      link.download = "result.png";
-      link.href = canvas.toDataURL();
-      link.click();
-    };
-  };
+  const dataUrl = c.toDataURL('image/png');
+  thumbPreview.src = dataUrl;
+  thumbSave.href = dataUrl;
+  thumbSave.download = 'thumbnail.png';
 });
 
+/* helper to draw image from src (dataURL or same-origin) returning Promise */
+function drawImageFromSrc(ctx, src, x,y,w,h){
+  return new Promise((resolve,reject)=>{
+    const i = new Image();
+    // try to avoid tainting: if src is data url or same-origin it's fine
+    i.crossOrigin = 'anonymous';
+    i.onload = ()=>{ ctx.drawImage(i,x,y,w,h); resolve(); };
+    i.onerror = ()=>{ resolve(); }; // don't fail overall
+    i.src = src;
+  });
+}
 
-// ▼▼ SNS 共有機能 ▼▼
-
-// X（Twitter）
-document.getElementById("shareX").addEventListener("click", () => {
-  const text = encodeURIComponent(`【うまく試着できるかな？】\n最高得点：${bestScore} 点！\nあなたも挑戦してみてね！`);
-  const url = encodeURIComponent(window.location.href);
-  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`);
+/* SNS buttons */
+document.getElementById('shareX').addEventListener('click', ()=>{
+  const text = encodeURIComponent(`うまく試着できるかな？ 最高得点: ${bestScore}点`);
+  const url  = encodeURIComponent(location.href);
+  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+});
+document.getElementById('shareLINE').addEventListener('click', ()=>{
+  const text = encodeURIComponent(`うまく試着できるかな？ 最高得点: ${bestScore}点\n${location.href}`);
+  window.open(`https://line.me/R/msg/text/?${text}`, '_blank');
+});
+document.getElementById('shareInsta').addEventListener('click', ()=>{
+  alert('Instagramはアプリに画像をアップする操作が必要です。まずは「サムネイル生成」→画像を保存して、Instagramで投稿してください。');
+  // try to open instagram app:
+  location.href = 'instagram://app';
 });
 
-// LINE
-document.getElementById("shareLINE").addEventListener("click", () => {
-  const text = encodeURIComponent(`最高得点：${bestScore} 点！\n「うまく試着できるかな？」で遊んでみてね！\n${window.location.href}`);
-  window.open(`https://line.me/R/msg/text/?${text}`);
+/* init: center moving image */
+window.addEventListener('load', ()=>{
+  const aw = gameArea.clientWidth, ah = gameArea.clientHeight;
+  const left = Math.max(0, (aw - imgW)/2);
+  const top  = Math.max(0, (ah - imgH)/2);
+  movingImage.style.left = left + 'px';
+  movingImage.style.top  = top  + 'px';
+  lastLeft = left; lastTop = top;
 });
-
-// Instagram（投稿API不可 → アプリ誘導）
-document.getElementById("shareInsta").addEventListener("click", () => {
-  alert("画像を保存した後、Instagramで投稿してね！");
-  window.open("instagram://app");  // Instagramアプリを開く
-});
-
-// スタート
-document.getElementById("start").addEventListener("click", startMoving);
 </script>
-
 </body>
 </html>
