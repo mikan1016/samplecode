@@ -1,313 +1,110 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>うまく試着できるかな？（自由移動）</title>
+<meta charset="UTF-8">
+<title>うまく試着できるかな？ - 自由移動</title>
+
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","メイリオ",sans-serif;margin:12px;}
-  header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-  h1{font-size:1.2rem;margin:0}
-  #controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-  #canvasWrapper{width:100%;height:65vh;border:2px solid #999;position:relative;overflow:hidden;background:#eee}
-  canvas{width:100%;height:100%;touch-action:none;display:block}
-  .thumb{width:120px;height:180px;object-fit:contain;border:3px solid transparent;cursor:pointer}
-  .selected{border-color:red}
-  button{padding:8px 12px;border-radius:8px}
+  body {
+    font-family: sans-serif;
+    background: #fafafa;
+    text-align: center;
+  }
+
+  #container {
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  #bg {
+    width: 100%;
+    border: 2px solid #555;
+  }
+
+  #char {
+    width: 300px;
+    height: 660px;
+    position: absolute;
+    top: 50px;
+    left: 50px;
+    touch-action: none;
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>うまく試着できるかな？（自由移動）</h1>
-  <nav><a href="index.html">ゲームページへ</a></nav>
-</header>
 
-<div id="controls">
-  <label>背景：
-    <input id="bgInput" type="file" accept="image/*">
-  </label>
+<h2>自由に試着してみよう（自由移動モード）</h2>
 
-  <div>
-    動かす画像：
-    <img id="img1" class="thumb" src="uniform1.png">
-    <img id="img2" class="thumb" src="uniform2.png">
-  </div>
+<p>背景画像を選ぶ：</p>
+<input type="file" id="bgInput" accept="image/*">
 
-  <button id="segBtn">自動切り抜き（人物）</button>
-  <button id="downloadBtn">合成画像をダウンロード</button>
+<p>動かす画像を選ぶ：</p>
+<select id="charSelect">
+  <option value="uniform1.png">画像1（制服A）</option>
+  <option value="uniform2.png">画像2（制服B）</option>
+</select>
 
-  <div id="snsArea">
-    <button id="shareX">X</button>
-    <button id="shareLINE">LINE</button>
-    <button id="shareInsta">Instagram</button>
-  </div>
-</div>
-
-<div id="canvasWrapper">
-  <canvas id="canvas"></canvas>
+<div id="container">
+  <img id="bg">
+  <img id="char" src="uniform1.png">
 </div>
 
 <script>
-/* ---------- 基本変数 ---------- */
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const wrapper = document.getElementById('canvasWrapper');
+const bg = document.getElementById("bg");
+const bgInput = document.getElementById("bgInput");
+const char = document.getElementById("char");
+const charSelect = document.getElementById("charSelect");
 
-function resizeCanvas(){
-  canvas.width = wrapper.clientWidth;
-  canvas.height = wrapper.clientHeight;
-  render();
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-/* 背景 */
-let bgDataUrl = null;
-document.getElementById('bgInput').addEventListener('change', e=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  const r = new FileReader();
-  r.onload = ev=>{ bgDataUrl = ev.target.result; render(); };
-  r.readAsDataURL(f);
+// 背景画像
+bgInput.addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (file) bg.src = URL.createObjectURL(file);
 });
 
-/* 選択画像 */
-const img1 = document.getElementById('img1'), img2 = document.getElementById('img2');
-let activeSrc = img1.src;
-img1.classList.add('selected');
-img1.addEventListener('click', ()=>{ activeSrc = img1.src; img1.classList.add('selected'); img2.classList.remove('selected'); render(); });
-img2.addEventListener('click', ()=>{ activeSrc = img2.src; img2.classList.add('selected'); img1.classList.remove('selected'); render(); });
+// 動く画像
+charSelect.addEventListener("change", () => {
+  char.src = charSelect.value;
+});
 
-/* 移動・スケール */
-let pos = {x: canvas.width/2, y: canvas.height/2};
-let scale = 1;
+// --- ドラッグ移動（PC + タッチ両対応） ---
+let offsetX = 0, offsetY = 0;
 let dragging = false;
-let lastTouchDist = null;
 
-/* move image object */
-const moveImg = new Image(); moveImg.src = activeSrc;
-moveImg.onload = ()=>render();
-
-/* render function */
-function render(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  // bg
-  if(bgDataUrl){
-    const b = new Image(); b.src = bgDataUrl;
-    b.onload = ()=>{ ctx.drawImage(b,0,0,canvas.width,canvas.height); drawMoveImg(); };
-    // if already cached, drawMoveImg may be called twice but it's ok
-  } else {
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); drawMoveImg();
-  }
-}
-function drawMoveImg(){
-  moveImg.src = activeSrc;
-  const baseW = 200, baseH = 300; // default size (half of previous)
-  const w = baseW * scale;
-  const h = baseH * scale;
-  const x = pos.x - w/2;
-  const y = pos.y - h/2;
-  // draw current image (no clipping)
-  moveImg.onload = ()=>{ ctx.drawImage(moveImg,x,y,w,h); };
-  // If already loaded, draw directly
-  if(moveImg.complete) ctx.drawImage(moveImg,x,y,w,h);
-}
-
-/* ドラッグ（マウス） */
-canvas.addEventListener('mousedown', e=>{
+function startDrag(e) {
   dragging = true;
-  const rect = canvas.getBoundingClientRect();
-  pos.x = e.clientX - rect.left;
-  pos.y = e.clientY - rect.top;
-  render();
-});
-document.addEventListener('mousemove', e=>{
-  if(!dragging) return;
-  const rect = canvas.getBoundingClientRect();
-  pos.x = e.clientX - rect.left;
-  pos.y = e.clientY - rect.top;
-  render();
-});
-document.addEventListener('mouseup', ()=>{ dragging = false; });
 
-/* タッチ：1指で移動、2指でピンチ */
-canvas.addEventListener('touchstart', e=>{
-  if(e.touches.length === 1){
-    dragging = true;
-    const rect = canvas.getBoundingClientRect();
-    pos.x = e.touches[0].clientX - rect.left;
-    pos.y = e.touches[0].clientY - rect.top;
-    render();
-  } else if(e.touches.length === 2){
-    lastTouchDist = getDist(e.touches[0], e.touches[1]);
-  }
-}, {passive:false});
+  const rect = char.getBoundingClientRect();
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
 
-canvas.addEventListener('touchmove', e=>{
+  offsetX = x - rect.left;
+  offsetY = y - rect.top;
+
   e.preventDefault();
-  if(e.touches.length === 1 && dragging){
-    const rect = canvas.getBoundingClientRect();
-    pos.x = e.touches[0].clientX - rect.left;
-    pos.y = e.touches[0].clientY - rect.top;
-    render();
-  } else if(e.touches.length === 2){
-    const d = getDist(e.touches[0], e.touches[1]);
-    if(lastTouchDist){
-      const diff = d - lastTouchDist;
-      scale += diff * 0.002;
-      scale = Math.max(0.2, Math.min(3, scale));
-      render();
-    }
-    lastTouchDist = d;
-  }
-}, {passive:false});
-
-canvas.addEventListener('touchend', e=>{
-  if(e.touches.length < 2) lastTouchDist = null;
-  if(e.touches.length === 0) dragging = false;
-});
-
-function getDist(a,b){
-  const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
-  return Math.sqrt(dx*dx + dy*dy);
 }
 
-/* ---------- 自動切り抜き（MediaPipe Tasks Vision ImageSegmenter） ---------- */
-/* We'll attempt to load the Tasks Vision library from jsdelivr. If not available, fallback to a simple threshold cut. */
+function moveDrag(e) {
+  if (!dragging) return;
 
-let segmenter = null;
-const segBtn = document.getElementById('segBtn');
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
 
-async function loadSegmenter(){
-  if(window.ImageSegmenter) return true; // already loaded
-  try{
-    // Load tasks-vision
-    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
-    // ImageSegmenter is available under window.tasks or window.ImageSegmenter depending on package
-    // Create a default segmenter for general purpose (person)
-    const {ImageSegmenter, FilesetResolver} = window;
-    // Some builds attach under window.tasks. Try both:
-    const tasks = window.tasks || window;
-    if(!tasks) return false;
-    // instantiate via tasks
-    // Using the hosted model via CDN is more involved — for simplicity, we'll attempt a quick method:
-    // If full API not available, we'll failover to simple threshold.
-    console.warn('MediaPipe tasks loaded, but full initialization is environment-dependent. Using fallback if needed.');
-    return false; // we won't rely on remote heavy model here; fallback to simpler approach
-  }catch(e){
-    console.warn('Failed to load MediaPipe tasks:', e);
-    return false;
-  }
+  char.style.left = (x - offsetX) + "px";
+  char.style.top = (y - offsetY) + "px";
 }
 
-// Very simple fallback segmentation: luminance threshold (not perfect)
-function simpleSegmentation(image){
-  // image is an HTMLImageElement or canvas
-  const tmp = document.createElement('canvas');
-  tmp.width = canvas.width; tmp.height = canvas.height;
-  const tctx = tmp.getContext('2d');
-  // draw image scaled to canvas
-  tctx.drawImage(image,0,0,tmp.width,tmp.height);
-  const id = tctx.getImageData(0,0,tmp.width,tmp.height);
-  const d = id.data;
-  // compute background mask by thresholding brightness: assume bg brighter than subject (heuristic)
-  for(let i=0;i<d.length;i+=4){
-    const r=d[i], g=d[i+1], b=d[i+2];
-    const lum = 0.2126*r + 0.7152*g + 0.0722*b;
-    if(lum > 230){ // very bright -> transparent
-      d[i+3] = 0;
-    }
-  }
-  tctx.putImageData(id,0,0);
-  return tmp.toDataURL('image/png');
+function endDrag() {
+  dragging = false;
 }
 
-// Perform segmentation on currently loaded background image (user photo).
-// We'll create a mask image (transparent background) and replace activeSrc with masked image if desired.
-segBtn.addEventListener('click', async ()=>{
-  // We will prompt user to upload a person photo and run segmentation on it, then set as activeSrc
-  // Simpler approach: ask for an image file
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept='image/*';
-  inp.onchange = async (e)=>{
-    const f = e.target.files[0];
-    if(!f) return;
-    const r = new FileReader();
-    r.onload = async ev=>{
-      const img = new Image();
-      img.onload = async ()=>{
-        // try was loading segmenter (we attempt but default to fallback)
-        const ok = await loadSegmenter();
-        if(ok && window.ImageSegmenter){
-          // If a fully working ImageSegmenter was present we'd call it here.
-          // For cross-environment reliability we will fallback to simpleSegmentation so the feature works offline.
-        }
-        // fallback:
-        const dataUrl = simpleSegmentation(img);
-        // Set the resulting masked image as a new object URL for activeSrc
-        activeSrc = dataUrl;
-        img1.classList.remove('selected'); img2.classList.remove('selected');
-        render();
-        alert('切り抜き（簡易版）を適用しました。より高精度を希望する場合はAIモデル（外部）を利用する案があります。');
-      };
-      img.src = ev.target.result;
-    };
-    r.readAsDataURL(f);
-  };
-  inp.click();
-});
+char.addEventListener("mousedown", startDrag);
+window.addEventListener("mousemove", moveDrag);
+window.addEventListener("mouseup", endDrag);
 
-/* ダウンロード合成 */
-document.getElementById('downloadBtn').addEventListener('click', async ()=>{
-  const w = canvas.width, h = canvas.height;
-  const off = document.createElement('canvas'); off.width=w; off.height=h;
-  const octx = off.getContext('2d');
-
-  // bg
-  if(bgDataUrl){
-    const b = new Image(); b.src = bgDataUrl;
-    await new Promise(r=>{ b.onload=r; });
-    octx.drawImage(b,0,0,w,h);
-  } else {
-    octx.fillStyle='#fff'; octx.fillRect(0,0,w,h);
-  }
-
-  // draw active moving image at pos & scale
-  const img = new Image(); img.src = activeSrc;
-  await new Promise(r=>{ img.onload=r; });
-  const baseW = 200, baseH = 300;
-  const drawW = baseW * scale, drawH = baseH * scale;
-  const drawX = pos.x - drawW/2, drawY = pos.y - drawH/2;
-  octx.drawImage(img, drawX, drawY, drawW, drawH);
-
-  // download
-  const link = document.createElement('a');
-  link.href = off.toDataURL('image/png');
-  link.download = 'tryon_free.png';
-  link.click();
-});
-
-/* SNS sharing (page link + message) */
-document.getElementById('shareX').addEventListener('click', ()=>{
-  const text = encodeURIComponent('うまく試着できるかな？ - 自由に試着してみてね');
-  const url = encodeURIComponent(location.href);
-  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
-});
-document.getElementById('shareLINE').addEventListener('click', ()=>{
-  const text = encodeURIComponent('うまく試着できるかな？ - 自由に試着してみてね\n' + location.href);
-  window.open(`https://line.me/R/msg/text/?${text}`, '_blank');
-});
-document.getElementById('shareInsta').addEventListener('click', ()=>{
-  alert('Instagramはブラウザから直接投稿できません。画像をダウンロードしてInstagramアプリで投稿してください。');
-  location.href = 'instagram://app';
-});
-
-/* initial render */
-function init(){
-  pos.x = canvas.width/2; pos.y = canvas.height/2; scale = 1;
-  render();
-}
-init();
+char.addEventListener("touchstart", startDrag);
+window.addEventListener("touchmove", moveDrag);
+window.addEventListener("touchend", endDrag);
 </script>
 
 </body>
