@@ -17,6 +17,7 @@
     max-width: 430px;
     margin: 0 auto;
     position: relative;
+    touch-action: none;
   }
 
   #bg {
@@ -28,10 +29,11 @@
   #char {
     position: absolute;
     width: 300px;
-    height: 660px;
+    height: auto;
     top: 60px;
     left: 60px;
     touch-action: none;
+    transform-origin: center;
   }
 
   button {
@@ -40,9 +42,10 @@
     margin: 5px;
     border-radius: 10px;
     border: none;
-    color: #fff;
+    color: white;
   }
 
+  #saveBtn { background: #4caf50; }
   .share-btn { background: #1d9bf0; }
   .line-btn { background: #00b900; }
 
@@ -75,8 +78,9 @@
   <img id="char" src="uniform1.png">
 </div>
 
-<hr>
+<button id="saveBtn">画像を保存</button>
 
+<hr>
 <h3>SNS共有</h3>
 <button class="share-btn" onclick="shareTwitter()">X（Twitter）で共有</button><br>
 <button class="line-btn" onclick="shareLine()">LINEで共有</button>
@@ -88,47 +92,52 @@ const bg = document.getElementById("bg");
 const bgInput = document.getElementById("bgInput");
 const char = document.getElementById("char");
 const charSelect = document.getElementById("charSelect");
+const container = document.getElementById("container");
 
-// 背景画像読込
+// 背景読込
 bgInput.addEventListener("change", e => {
   const file = e.target.files[0];
-  if(file) bg.src = URL.createObjectURL(file);
+  if (file) bg.src = URL.createObjectURL(file);
 });
 
-// キャラ画像変更
+// 制服選択
 charSelect.addEventListener("change", () => {
   char.src = charSelect.value;
 });
 
-// --- ドラッグ移動 ---
+// ---- ドラッグ移動（範囲制限あり）----
 let dragging = false;
 let offsetX = 0;
 let offsetY = 0;
 
+function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
 function startDrag(e){
   dragging = true;
-
   const rect = char.getBoundingClientRect();
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   const y = e.touches ? e.touches[0].clientY : e.clientY;
-
   offsetX = x - rect.left;
   offsetY = y - rect.top;
 }
 
 function moveDrag(e){
-  if(!dragging) return;
+  if (!dragging) return;
 
-  const x = e.touches ? e.touches[0].clientX : e.clientX;
-  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  const bgRect = bg.getBoundingClientRect();
+  const charRect = char.getBoundingClientRect();
 
-  char.style.left = (x - offsetX) + "px";
-  char.style.top = (y - offsetY) + "px";
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - offsetX;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - offsetY;
+
+  const newX = clamp(x, bgRect.left, bgRect.right - charRect.width);
+  const newY = clamp(y, bgRect.top, bgRect.bottom - charRect.height);
+
+  char.style.left = (newX - bgRect.left) + "px";
+  char.style.top = (newY - bgRect.top) + "px";
 }
 
-function endDrag(){
-  dragging = false;
-}
+function endDrag(){ dragging = false; }
 
 char.addEventListener("mousedown", startDrag);
 window.addEventListener("mousemove", moveDrag);
@@ -138,7 +147,56 @@ char.addEventListener("touchstart", startDrag);
 window.addEventListener("touchmove", moveDrag);
 window.addEventListener("touchend", endDrag);
 
-// ===== SNS共有 =====
+// ---- ピンチ拡大縮小 ----
+let lastDist = 0;
+let scale = 1;
+
+container.addEventListener("touchmove", e => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (lastDist !== 0) {
+      const delta = dist - lastDist;
+      scale += delta * 0.003;
+      scale = clamp(scale, 0.3, 2.5);
+      char.style.transform = `scale(${scale})`;
+    }
+    lastDist = dist;
+  }
+});
+
+container.addEventListener("touchend", () => { lastDist = 0 });
+
+// ---- 保存（背景＋キャラ合成）----
+document.getElementById("saveBtn").onclick = () => {
+  const rect = bg.getBoundingClientRect();
+
+  const canvas = document.createElement("canvas");
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.drawImage(bg, 0, 0, rect.width, rect.height);
+
+  const charRect = char.getBoundingClientRect();
+  const x = charRect.left - rect.left;
+  const y = charRect.top - rect.top;
+
+  ctx.save();
+  ctx.translate(x + charRect.width/2, y + charRect.height/2);
+  ctx.scale(scale, scale);
+  ctx.drawImage(char, -charRect.width/2, -charRect.height/2);
+  ctx.restore();
+
+  const link = document.createElement("a");
+  link.download = "tryon_free.png";
+  link.href = canvas.toDataURL();
+  link.click();
+};
+
+// SNS共有
 function shareTwitter(){
   const text = encodeURIComponent("自由に試着して遊んでみた！");
   const url = encodeURIComponent(location.href);
